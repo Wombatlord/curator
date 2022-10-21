@@ -2,6 +2,7 @@ import urllib3
 import os
 import json
 from dotenv import load_dotenv
+from data import Gallery, Painting
 
 load_dotenv()
 
@@ -23,10 +24,17 @@ r = http.request('GET', 'https://api.harvardartmuseums.org/object',
                  })
 
 data = json.loads(r.data.decode('utf-8'))
-# data_formatted = json.dumps(data, indent=2)
+data_formatted = json.dumps(data, indent=2)
 # print(data_formatted)
 
-for entry in data["records"]:
-    if entry["datebegin"] == entry["dateend"]:
-        name = entry["people"][0]["name"]
-        print(entry["title"] + ": " + name + ": " + entry["dated"])
+# for entry in data["records"]:
+#     if entry["datebegin"] == entry["dateend"]:
+#         name = entry["people"][0]["name"]
+#         print(entry["title"] + ": " + name + ": " + entry["dated"])
+
+myGallery = Gallery.parse(data)
+
+for painting in myGallery.records:
+    paintings = Painting.parse(painting)
+
+    print(paintings.title)
