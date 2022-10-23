@@ -17,7 +17,7 @@ class Archive:
 
 
 @dataclass
-class Painting:
+class Artifact:
     accessionyear: str
     objectnumber: str
     title: str
@@ -27,6 +27,7 @@ class Painting:
     url: str
     medium: str
     primaryimageurl: str
+    imagepermissionlevel: int
 
     @classmethod
     def parse(cls, data: Archive):
@@ -39,13 +40,18 @@ class Painting:
             "url": data["url"],
             "accessionyear": data["accessionyear"],
             "medium": data["medium"],
-            "primaryimageurl": data["primaryimageurl"]
+            "primaryimageurl": data["primaryimageurl"],
+            "imagepermissionlevel": data["imagepermissionlevel"]
         }
         return cls(**kwargs)
 
     @property
     def strict_date(self) -> bool:
         return self.datebegin == self.dateend
+    
+    @property
+    def has_image_links(self) -> bool:
+        return self.imagepermissionlevel == 0
 
 @dataclass
 class People:
@@ -55,7 +61,7 @@ class People:
     culture: str
 
     @classmethod
-    def parse(cls, data: Painting):
+    def parse(cls, data: Artifact):
         kwargs = {
             "role": data[0]["role"],
             "name": data[0]["name"],
