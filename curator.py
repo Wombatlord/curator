@@ -2,7 +2,7 @@ import urllib3
 import os
 import json
 from dotenv import load_dotenv
-from data import Archive, Painting, People
+from data import Archive, Artifact, People
 
 load_dotenv()
 
@@ -15,16 +15,17 @@ r = http.request('GET', 'https://api.harvardartmuseums.org/object',
                  fields={
                      'apikey': apiKey,
                      'yearmade': year,
+                     'page': 1,
                      # 26 is the classification id for paintings in Harvard Art Museum data.
                      # 30 is sculpture, a | allows for multiple classifications.
-                     'classification': '26|30',
+                     'classification': '30',
                      # how many items in a response per page.
-                     'size': 25,
+                     'size': 10,
                      'hasimage': 1,
-                     'page': 1,
                      # fields we want included in the response.
-                     'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl'
+                     'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel'
                  })
+
 
 data = json.loads(r.data.decode('utf-8'))
 # data_formatted = json.dumps(data, indent=2)
@@ -36,57 +37,68 @@ data = json.loads(r.data.decode('utf-8'))
 #         print(entry["title"] + ": " + name + ": " + entry["dated"])
 
 currentArchive = Archive.parse(data)
-# print(currentArchive.records[0]["people"])
+
 
 def next_page(page):
     page += 1
-    print(f"\n\nNEXT PAGE: {page}\n\n")
+    print(f"NEXT PAGE: {page}\n")
     r = http.request('GET', 'https://api.harvardartmuseums.org/object',
                      fields={
                          'apikey': apiKey,
                          'yearmade': year,
                          'page': page,
                          # 26 is the classification id for paintings in Harvard Art Museum data.
-                         'classification': '26|30',
+                         'classification': '30',
                          # how many items in a response per page.
-                         'size': 25,
+                         'size': 10,
                          'hasimage': 1,
                          # fields we want included in the response.
-                         'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl'
+                         'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel'
                      })
-    
+
     data = json.loads(r.data.decode('utf-8'))
 
     return Archive.parse(data)
 
-def exhibit_index(archive: Archive):
-    for i, painting in enumerate(archive.records):
-        paintings = Painting.parse(painting)
 
-        if paintings.strict_date == True:
-            title = paintings.title
+def exhibit_index(archive: Archive, exhibit: list) -> list:
+    for i, paintings in enumerate(archive.records):
+        painting = Artifact.parse(paintings)
+
+        if painting.strict_date and painting.has_image_links:
+
+            title = painting.title
             artist = People.parse(archive.records[i]["people"])
-            date = paintings.dated
-            medium = paintings.medium
-            url = paintings.url
-            imageurl = paintings.primaryimageurl
-            year_bought = paintings.accessionyear
+            date = painting.dated
+            medium = painting.medium
+            url = painting.url
+            imageurl = painting.primaryimageurl
+            year_bought = painting.accessionyear
 
-            if paintings.primaryimageurl == None:
+            if painting.primaryimageurl == None:
                 imageurl = "No Direct Image Url"
 
-            print(
+            # print(
+            #     f"{i}: {title}: {artist.name}: {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n")
+            exhibit.append(
                 f"{title}: {artist.name}: {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n")
-
-            # print(paintings.title + ": " + artist.name + ": " + paintings.dated + "\n" + paintings.medium +
-            #       "\n" + paintings.url + "\n" + str(paintings.primaryimageurl) + "\n" + str(paintings.accessionyear) + "\n")
 
     try:
         if archive.info['next']:
-            exhibit_index(next_page(archive.info["page"]))
+            exhibit_index(next_page(archive.info["page"]), exhibit)
     except:
         pass
+    
+    return exhibit
 
+gallery = set(exhibit_index(currentArchive, exhibit=[]))
+print(f"There are {len(gallery)} objects in your gallery. \n")
 
-exhibit_index(currentArchive)
+for i, item in enumerate(gallery):
+    print(str(i) + ": " + item)
+
 print(currentArchive.info)
+
+# SET is working to prevent duplicate entries. It seems when duplicates are present, they have overwritten another item in the response.
+# The overwritten item may not fit the filter criteria in this script (eg, may not have an image url), so could appear as "extra" items
+# or as an overwrite of something that would be there normally.
