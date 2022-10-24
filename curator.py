@@ -1,6 +1,7 @@
 import urllib3
 import os
 import json
+import sys
 from dotenv import load_dotenv
 from data import Archive, Artifact, People
 
@@ -10,62 +11,54 @@ apiKey = os.environ.get("KEY")
 http = urllib3.PoolManager()
 
 year = 1990
+raw_data: list[bytes] = []
 
-r = http.request('GET', 'https://api.harvardartmuseums.org/object',
-                 fields={
-                     'apikey': apiKey,
-                     'yearmade': year,
-                     'page': 1,
-                     # 26 is the classification id for paintings in Harvard Art Museum data.
-                     # 30 is sculpture, a | allows for multiple classifications.
-                     'classification': '30',
-                     # how many items in a response per page.
-                     'size': 10,
-                     'hasimage': 1,
-                     # fields we want included in the response.
-                     'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel'
-                 })
+def get_raw(key: str, page: int, year_: int) -> dict:
+    r = http.request('GET', 'https://api.harvardartmuseums.org/object',
+                     fields={
+                         'apikey': key,
+                         'yearmade': year_,
+                         'page': page,
+                         # 26 is the classification id for paintings in Harvard Art Museum data.
+                         'classification': '26',
+                         # how many items in a response per page.
+                         'size': 5,
+                         'hasimage': 1,
+                         # fields we want included in the response.
+                         'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel,id'
+                     })
+    raw = r.data
+    raw_data.append(raw)
+    return json.loads(r.data.decode())
 
+def get_raw_fixture(_: str, page: int, __: int) -> dict:    
+    print("FIXTURE\n")
+    return json.load(open(f"./fixtures/page-{page}.json"))
 
-data = json.loads(r.data.decode('utf-8'))
-# data_formatted = json.dumps(data, indent=2)
-# print(data_formatted)
+test_mode = "-t" in sys.argv
 
-# for entry in data["records"]:
-#     if entry["datebegin"] == entry["dateend"]:
-#         name = entry["people"][0]["name"]
-#         print(entry["title"] + ": " + name + ": " + entry["dated"])
-
-currentArchive = Archive.parse(data)
+# Swaps out retrieve implementation for testing against dumped snapshots
+match test_mode:
+    case True: 
+        retrieve = get_raw_fixture
+    case False: 
+        retrieve = get_raw
 
 
 def next_page(page):
     page += 1
     print(f"NEXT PAGE: {page}\n")
-    r = http.request('GET', 'https://api.harvardartmuseums.org/object',
-                     fields={
-                         'apikey': apiKey,
-                         'yearmade': year,
-                         'page': page,
-                         # 26 is the classification id for paintings in Harvard Art Museum data.
-                         'classification': '30',
-                         # how many items in a response per page.
-                         'size': 10,
-                         'hasimage': 1,
-                         # fields we want included in the response.
-                         'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel'
-                     })
-
-    data = json.loads(r.data.decode('utf-8'))
+    data = retrieve(apiKey, page, year)
 
     return Archive.parse(data)
 
 
-def exhibit_index(archive: Archive, exhibit: list) -> list:
+def exhibit_index(archive: Archive, exhibit: list) -> list[str]:
     for i, paintings in enumerate(archive.records):
         painting = Artifact.parse(paintings)
 
         if painting.strict_date and painting.has_image_links:
+            print("LOG:", f"{painting.id=}")
 
             title = painting.title
             artist = People.parse(archive.records[i]["people"])
@@ -91,7 +84,10 @@ def exhibit_index(archive: Archive, exhibit: list) -> list:
     
     return exhibit
 
-gallery = set(exhibit_index(currentArchive, exhibit=[]))
+
+currentArchive = Archive.parse(retrieve(apiKey, 1, year))
+
+gallery = exhibit_index(currentArchive, exhibit=[])
 print(f"There are {len(gallery)} objects in your gallery. \n")
 
 for i, item in enumerate(gallery):
@@ -99,6 +95,17 @@ for i, item in enumerate(gallery):
 
 print(currentArchive.info)
 
-# SET is working to prevent duplicate entries. It seems when duplicates are present, they have overwritten another item in the response.
-# The overwritten item may not fit the filter criteria in this script (eg, may not have an image url), so could appear as "extra" items
-# or as an overwrite of something that would be there normally.
+# Dump raw data snapshots if -d or --dump appear in command line args
+dump_mode = set(sys.argv) & {"-d", "--dump"} != set()
+if dump_mode:
+    for i, content in enumerate(raw_data):
+        i+=1
+        with open(f"./fixtures/page-{i}.json", "w+") as file:
+            file.write(
+                # load the json from the bytes, and then dump to string with formatting
+                json.dumps(
+                    json.loads(content.decode()), 
+                    indent=4, 
+                    sort_keys=True,
+                ),
+            )
