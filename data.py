@@ -18,6 +18,7 @@ class Archive:
 
 @dataclass
 class Artifact:
+    id: int
     accessionyear: str
     objectnumber: str
     title: str
@@ -30,8 +31,9 @@ class Artifact:
     imagepermissionlevel: int
 
     @classmethod
-    def parse(cls, data: Archive):
+    def parse(cls, data: dict):
         kwargs = {
+            "id": data["id"],
             "objectnumber": data["objectnumber"],
             "title": data["title"],
             "dated": data["dated"],
