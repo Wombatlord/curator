@@ -3,6 +3,7 @@ venv
 fixtures/page-*.json
 
 scratch.py
+test.sh
 
 .env
 .python-version
