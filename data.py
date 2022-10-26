@@ -63,7 +63,7 @@ class People:
     culture: str
 
     @classmethod
-    def parse(cls, data: Artifact):
+    def parse(cls, data: dict):
         kwargs = {
             "role": data[0]["role"],
             "name": data[0]["name"],
