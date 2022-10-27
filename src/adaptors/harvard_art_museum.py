@@ -39,10 +39,11 @@ class HAM_Artifact(Result):
     medium: str
     primaryimageurl: str
     imagepermissionlevel: int
+    people: list
 
     def __str__(self) -> str:
         title = self.title
-        # artist = HAM_People.parse(self.people)
+        artist = HAM_People.parse(self.people)
         date = self.dated
         medium = self.medium
         url = self.url
@@ -52,7 +53,7 @@ class HAM_Artifact(Result):
         if self.primaryimageurl == None:
             imageurl = "No Direct Image Url"
 
-        return f"{title}: : {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n"
+        return f"{title}: {artist.name}: {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n"
 
     @classmethod
     def parse(cls, data: dict):
@@ -68,7 +69,7 @@ class HAM_Artifact(Result):
             "medium": data["medium"],
             "primaryimageurl": data["primaryimageurl"],
             "imagepermissionlevel": data["imagepermissionlevel"],
-            # "people": data.get("people", [])
+            "people": data.get("people", [])
         }
         return cls(**kwargs)
 
