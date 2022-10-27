@@ -4,6 +4,8 @@ fixtures/page-*.json
 
 scratch.py
 test.sh
+test.py
+aic.py
 
 .env
 .python-version
