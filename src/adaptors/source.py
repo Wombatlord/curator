@@ -11,6 +11,11 @@ class Source:
     def next(self) -> Result:
         raise NotImplemented()
 
+    def dump(self):
+        raise NotImplemented()
+
+    def obj_dump(self):
+        raise NotImplemented()
+
     def filter(self, filterFunc: typing.Callable[[Result], bool]) -> typing.Sequence[Result]:
         return filter(filterFunc, self.all())
-

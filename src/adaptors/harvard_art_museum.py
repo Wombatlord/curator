@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from src.adaptors.source import Result, Source as _Source
 import urllib3
 import json
@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _KEY = os.environ.get("KEY")
+
 
 @dataclass
 class HAM_Archive:
@@ -55,6 +56,20 @@ class HAM_Artifact(Result):
 
         return f"{title}: {artist.name}: {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n"
 
+    @property
+    def __dict__(self):
+        """
+        get a python dictionary
+        """
+        return asdict(self)
+    
+    @property
+    def json(self):
+        """
+        get the json formated string
+        """
+        return json.dumps(self.__dict__)
+
     @classmethod
     def parse(cls, data: dict):
         kwargs = {
@@ -76,10 +91,11 @@ class HAM_Artifact(Result):
     @property
     def strict_date(self) -> bool:
         return self.datebegin == self.dateend
-    
+
     @property
     def has_image_links(self) -> bool:
         return self.imagepermissionlevel == 0
+
 
 @dataclass
 class HAM_People:
@@ -101,20 +117,21 @@ class HAM_People:
 
 def _get_raw(page: int, year: int) -> dict:
     http = urllib3.PoolManager()
-    fields={
+    fields = {
         'apikey': _KEY,
         'yearmade': year,
         'page': page,
         # 26 is the classification id for paintings in Harvard Art Museum data.
         'classification': '26',
         # how many items in a response per page.
-        'size': 5,
+        'size': 10,
         'hasimage': 1,
         # fields we want included in the response.
         'fields': 'objectnumber,title,dated,datebegin,dateend,url,people,accessionyear,medium,primaryimageurl,imagepermissionlevel,id'
     }
 
-    r = http.request('GET', 'https://api.harvardartmuseums.org/object', fields=fields)
+    r = http.request(
+        'GET', 'https://api.harvardartmuseums.org/object', fields=fields)
     # print(r.data)
     return json.loads(r.data.decode('utf-8'))
 
@@ -128,7 +145,7 @@ class Source(_Source):
 
     year: int
 
-    def __init__(self, year=None, **_) -> None:
+    def __init__(self, year=1990, **_) -> None:
         super().__init__()
         self.year = year
 
@@ -141,8 +158,8 @@ class Source(_Source):
         current = page
         while True:
             for record in current.records:
-                yield record
-            
+                yield HAM_Artifact.parse(record)
+
             if current.info.get("next", None) and (page_num := current.info.get("page", None)):
                 current = self._next_page(page_num)
             else:
@@ -154,5 +171,27 @@ class Source(_Source):
     def next(self) -> Result:
         if self._cached_iter is None:
             self._cached_iter = self.all()
-        
+
         return next(self._cached_iter)
+
+    def obj_dump(self):
+        artifacts = {"exhibit": []}
+        for i, artifact in enumerate(self.all()):
+            artifacts["exhibit"].append({f"HAM_{i}: ": artifact.__dict__})
+
+        print(json.dumps(artifacts, indent=4))
+        
+
+    @staticmethod
+    def dump():
+        raw_data: dict = _get_raw(0, 1990)
+        with open(f"./fixtures/page.json", "w+") as file:
+            file.write(
+                # load the json from the bytes, and then dump to string with formatting
+                json.dumps(
+                    raw_data,
+                    indent=4,
+                    sort_keys=True,
+                ),
+            )
+    
