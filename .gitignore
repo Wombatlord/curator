@@ -1,6 +1,7 @@
 __pycache__/
 venv
-fixtures/page-*.json
+fixtures/*
+fixturesTest/*
 
 scratch.py
 test.sh
