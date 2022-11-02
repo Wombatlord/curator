@@ -9,6 +9,9 @@ class AbstractCurator:
     def curate_exhibit(self, sources: list[type[Source]]):
         raise NotImplementedError
 
+    def dump_full_exhibit(self, source_class: type[Source]):
+        raise NotImplementedError
+
     def dump_filtered_exhibit(self, source_class: type[Source]):
         raise NotImplementedError
 
@@ -23,22 +26,43 @@ class Curator(AbstractCurator):
             for record in records:
                 print(record)
 
-    def curate_source(self, source_class: type[Source]):
+    def curate_source(self, source_class: type[Source], gallery: list) -> list:
         for item in source_class().filter(Curator._ham_date_image_filter):
-            print(item)
+            gallery.append(item)
+
+        return gallery
 
     def curate_exhibit(self, sources: list[type[Source]]):
         for source in sources:
-            # self.curate_source(source)
-            self.dump_filtered_exhibit(source)
+            # return self.curate_source(source, [])
+            self.dump_filtered_exhibit(source, [])
 
-    def dump_filtered_exhibit(self, source_class: type[Source]):
+    def dump_filtered_exhibit(self, source_class: type[Source], l):
+        artifacts = {"exhibit": []}
+        
+        with open(f"./fixturesTest/page.json", "w+") as file:
+            for i, item in enumerate(self.curate_source(source_class, l)):
+                artifacts["exhibit"].append({f"Artifact {i}:": str(item)})
+
+            file.write(
+                # load the json from the bytes, and then dump to string with formatting
+                json.dumps(
+                    artifacts,
+                    indent=4,
+                    sort_keys=True,
+                ),
+            )
+
+    def dump_full_exhibit(self, source_class: type[Source]):
+        """
+        This one works if I remove people fields from the HAM_Artifact
+        """
         artifacts = {"exhibit": []}
         with open(f"./fixturesTest/page.json", "w+") as file:
 
-            for i, item in enumerate(source_class().filter(Curator._ham_date_image_filter)):
+            for i, item in enumerate(source_class().all()):
                 artifacts["exhibit"].append({f"Artifact {i}:": str(item)})
-            
+
             file.write(
                 # load the json from the bytes, and then dump to string with formatting
                 json.dumps(
