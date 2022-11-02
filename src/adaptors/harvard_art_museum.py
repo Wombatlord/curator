@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from src.adaptors.source import Result, Source as _Source
 import urllib3
 import json
@@ -30,31 +30,28 @@ class HAM_Archive:
 @dataclass
 class HAM_Artifact(Result):
     id: int
-    accessionyear: str
-    objectnumber: str
-    title: str
-    dated: str
-    datebegin: int
-    dateend: int
-    url: str
-    medium: str
-    primaryimageurl: str
-    imagepermissionlevel: int
-    people: list
+    accessionyear: str | None = None
+    objectnumber: str | None = None
+    title: str | None = None
+    dated: str | None = None
+    datebegin: int | None = None
+    dateend: int | None = None
+    url: str | None = None
+    medium: str | None = None
+    primaryimageurl: str | None = None
+    imagepermissionlevel: int | None = None
+    people: list[HAM_People] = field(default_factory=lambda: [])
 
     def __str__(self) -> str:
-        title = self.title
-        artist = HAM_People.parse(self.people)
-        date = self.dated
-        medium = self.medium
-        url = self.url
-        imageurl = self.primaryimageurl
-        year_bought = self.accessionyear
+        artist = HAM_People.parse(self.people[0]) if self.people else None
 
-        if self.primaryimageurl == None:
-            imageurl = "No Direct Image Url"
-
-        return f"{title}: {artist.name}: {date}\n{medium}\n{url}\n{imageurl}\nacquired: {year_bought}\n"
+        return "\n".join((
+            f"{self.title}: {artist.name if artist else 'unknown'}: {self.dated}",
+            f"{self.medium}",
+            f"{self.url or 'none provided'}",
+            f"{self.primaryimageurl}",
+            f"acquired: {self.accessionyear}",
+        ))
 
     @property
     def __dict__(self):
@@ -62,7 +59,7 @@ class HAM_Artifact(Result):
         get a python dictionary
         """
         return asdict(self)
-    
+
     @property
     def json(self):
         """
@@ -72,21 +69,7 @@ class HAM_Artifact(Result):
 
     @classmethod
     def parse(cls, data: dict):
-        kwargs = {
-            "id": data["id"],
-            "objectnumber": data["objectnumber"],
-            "title": data["title"],
-            "dated": data["dated"],
-            "datebegin": data["datebegin"],
-            "dateend": data["dateend"],
-            "url": data["url"],
-            "accessionyear": data["accessionyear"],
-            "medium": data["medium"],
-            "primaryimageurl": data["primaryimageurl"],
-            "imagepermissionlevel": data["imagepermissionlevel"],
-            "people": data.get("people", [])
-        }
-        return cls(**kwargs)
+        return cls(**_initialise_artifact_raw(data))
 
     @property
     def strict_date(self) -> bool:
@@ -107,12 +90,13 @@ class HAM_People:
     @classmethod
     def parse(cls, data: dict):
         kwargs = {
-            "role": data[0]["role"],
-            "name": data[0]["name"],
-            "gender": data[0]["gender"],
-            "culture": data[0]["culture"]
+            **data
         }
-        return cls(**kwargs)
+        filtered = {
+            k: v for k, v in kwargs.items()
+            if k in {*cls.__annotations__.keys()}
+        }
+        return cls(**filtered)
 
 
 def _get_raw(page: int, year: int) -> dict:
@@ -180,7 +164,6 @@ class Source(_Source):
             artifacts["exhibit"].append({f"HAM_{i}: ": artifact.__dict__})
 
         print(json.dumps(artifacts, indent=4))
-        
 
     @staticmethod
     def dump():
@@ -194,4 +177,22 @@ class Source(_Source):
                     sort_keys=True,
                 ),
             )
-    
+
+
+def _initialise_artifact_raw(json_dict: dict) -> dict:
+    default_resource = {
+        "id": json_dict["id"],
+        "objectnumber": None,
+        "title": None,
+        "dated": None,
+        "datebegin": None,
+        "dateend": None,
+        "url": None,
+        "accessionyear": None,
+        "medium":  None,
+        "primaryimageurl": None,
+        "imagepermissionlevel": None,
+        "people": []
+    }
+
+    return {**default_resource, **json_dict}
