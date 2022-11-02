@@ -4,16 +4,16 @@ import json
 
 class AbstractCurator:
     def full_exhibit(self) -> list:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def curate_exhibit(self, sources: list[type[Source]]):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def dump_full_exhibit(self, source_class: type[Source]):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def dump_filtered_exhibit(self, source_class: type[Source]):
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class Curator(AbstractCurator):
@@ -35,7 +35,7 @@ class Curator(AbstractCurator):
     def curate_exhibit(self, sources: list[type[Source]]):
         for source in sources:
             # return self.curate_source(source, [])
-            self.dump_filtered_exhibit(source, [])
+            self.dump_full_exhibit(source)
 
     def dump_filtered_exhibit(self, source_class: type[Source], l):
         artifacts = {"exhibit": []}
@@ -54,9 +54,6 @@ class Curator(AbstractCurator):
             )
 
     def dump_full_exhibit(self, source_class: type[Source]):
-        """
-        This one works if I remove people fields from the HAM_Artifact
-        """
         artifacts = {"exhibit": []}
         with open(f"./fixturesTest/page.json", "w+") as file:
 
