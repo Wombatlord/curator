@@ -1,46 +1,41 @@
-from __future__ import annotations
-from dataclasses import dataclass, asdict, field
-from src.adaptors.source import Result, Source as _Source
+from __future__ import annotations # Even compatible with this!
+import os
 import urllib3
 import json
-import typing
-from typing import Sequence
-import os
 from dotenv import load_dotenv
+from typing import Sequence
+from resourceez.api_object import from_annotations, ApiObject
+from src.adaptors.source import Result, Source as _Source
 
 load_dotenv()
-
 _KEY = os.environ.get("KEY")
 
-
-@dataclass
-class HAM_Archive:
+    
+class HAM_Archive(ApiObject):
     info: dict
-    records: list[dict]
+    records: list[HAM_Artifact]
 
-    @classmethod
-    def parse(cls, data: dict) -> HAM_Archive:
-        kwargs = {
-            "info": data["info"],
-            "records": data["records"]
-        }
-        return cls(**kwargs)
+@from_annotations
+class HAM_People(ApiObject):
+    role: str
+    name: str
+    gender: str
+    culture: str
 
-
-@dataclass
-class HAM_Artifact(Result):
+@from_annotations
+class HAM_Artifact(Result, ApiObject):
     id: int
-    accessionyear: str | None = None
-    objectnumber: str | None = None
-    title: str | None = None
-    dated: str | None = None
-    datebegin: int | None = None
-    dateend: int | None = None
-    url: str | None = None
-    medium: str | None = None
-    primaryimageurl: str | None = None
-    imagepermissionlevel: int | None = None
-    people: list[HAM_People] = field(default_factory=lambda: [])
+    accessionyear: str
+    objectnumber: str
+    title: str
+    dated: str
+    datebgin: int
+    dateend: int
+    url: str
+    medium: str
+    primaryimageurl: str
+    imagepermissionlevel: int
+    people: list[HAM_People] = []
 
     def __str__(self) -> str:
         artist = HAM_People.parse(self.people[0]) if self.people else None
@@ -52,25 +47,7 @@ class HAM_Artifact(Result):
             f"{self.primaryimageurl}",
             f"acquired: {self.accessionyear}",
         ))
-
-    @property
-    def __dict__(self):
-        """
-        get a python dictionary
-        """
-        return asdict(self)
-
-    @property
-    def json(self):
-        """
-        get the json formated string
-        """
-        return json.dumps(self.__dict__)
-
-    @classmethod
-    def parse(cls, data: dict):
-        return cls(**_initialise_artifact_raw(data))
-
+    
     @property
     def strict_date(self) -> bool:
         return self.datebegin == self.dateend
@@ -78,26 +55,6 @@ class HAM_Artifact(Result):
     @property
     def has_image_links(self) -> bool:
         return self.imagepermissionlevel == 0
-
-
-@dataclass
-class HAM_People:
-    role: str
-    name: str
-    gender: str
-    culture: str
-
-    @classmethod
-    def parse(cls, data: dict):
-        kwargs = {
-            **data
-        }
-        filtered = {
-            k: v for k, v in kwargs.items()
-            if k in {*cls.__annotations__.keys()}
-        }
-        return cls(**filtered)
-
 
 def _get_raw(page: int, year: int) -> dict:
     http = urllib3.PoolManager()
@@ -122,7 +79,6 @@ def _get_raw(page: int, year: int) -> dict:
 
 def _get_archive(*args) -> HAM_Archive:
     return HAM_Archive.parse(_get_raw(*args))
-
 
 class Source(_Source):
     _cached_iter: Sequence[Result] | None = None
@@ -177,22 +133,3 @@ class Source(_Source):
                     sort_keys=True,
                 ),
             )
-
-
-def _initialise_artifact_raw(json_dict: dict) -> dict:
-    default_resource = {
-        "id": json_dict["id"],
-        "objectnumber": None,
-        "title": None,
-        "dated": None,
-        "datebegin": None,
-        "dateend": None,
-        "url": None,
-        "accessionyear": None,
-        "medium":  None,
-        "primaryimageurl": None,
-        "imagepermissionlevel": None,
-        "people": []
-    }
-
-    return {**default_resource, **json_dict}
